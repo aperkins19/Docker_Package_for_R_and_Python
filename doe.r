@@ -33,15 +33,15 @@ design <- ccd(basis = 3,
                 randomize = FALSE,
                 inscribed = FALSE)
 
-print(design)
 
+#box_benken_coded  <- decode.data(box_benken, var1 ~ (x1 - 10)/5, var2 ~ (x2 - 50)/10, var3 ~ (x3 - 100)/20)
+box_benken_decoded  <- recode.data(box_benken, coding = c(var1 ~ (x1 - 10)/5, var2 ~ (x2 - 50)/10, var3 ~ (x3 - 100)/20))
+print(box_benken_coded)
 
 CR1 <- coded.data(ChemReact1, x1 ~ (Time - 85)/5, x2 ~ (Temp - 175)/5)
 CR1 <- as.data.frame(CR1)
+print(ChemReact1)
 print(CR1)
-
-print("new text")
-print("blah")
 
 #ggplot(design, aes(x=x1.as.is,y=x2.as.is,z=x3.as.is)) +
 #  geom_point()
