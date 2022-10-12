@@ -4,27 +4,24 @@ library(rsm)
 # https://cran.r-project.org/web/packages/rsm/rsm.pdf
 
 # Load the package required to read JSON files.
- library(rjson)
+library(rjson)
 
 # Load the package required to plot.
 library(ggplot2)
 
+# load dplyr
+library(dplyr)
 
 # Import the components to modulate JSON
 components_json <- fromJSON(file = "components.json")
 # convert to Dataframe
 components_df <- as.data.frame(components_json)
-# Print the result.
-print(components_df)
 
-# get the number of rows of the df to use as # of variables for generating design
-
+# get the number of rows of the df to use as # of variables for generating design_coded
 number_of_variables <- nrow(components_df)
 
-
-box_benken <- bbd(3, randomize=FALSE)
-print(box_benken)
-design <- ccd(basis = 3,
+# intialises dexperimental design_coded
+design_coded <- ccd(basis = number_of_variables,
                 n0 = 4,
                 blocks = "Block",
                 alpha = "orthogonal",
@@ -33,15 +30,51 @@ design <- ccd(basis = 3,
                 randomize = FALSE,
                 inscribed = FALSE)
 
+# convert the design_coded object to a data.frame
+design_coded <- as.data.frame(design_coded)
 
-#box_benken_coded  <- decode.data(box_benken, var1 ~ (x1 - 10)/5, var2 ~ (x2 - 50)/10, var3 ~ (x3 - 100)/20)
-box_benken_decoded  <- recode.data(box_benken, coding = c(var1 ~ (x1 - 10)/5, var2 ~ (x2 - 50)/10, var3 ~ (x3 - 100)/20))
-print(box_benken_coded)
+# iterate over the data.frame rows returning row as an integer
+for (row in 1:nrow(components_df)) {
 
-CR1 <- coded.data(ChemReact1, x1 ~ (Time - 85)/5, x2 ~ (Temp - 175)/5)
-CR1 <- as.data.frame(CR1)
-print(ChemReact1)
-print(CR1)
+    # store the variable name to rename the new column later 
+    variable_name <- components_df[row,"Variable"]
 
-#ggplot(design, aes(x=x1.as.is,y=x2.as.is,z=x3.as.is)) +
-#  geom_point()
+    # create a string with the format "x#" with # as the row number.
+    coded_column_name <- paste("x", toString(row), sep="")
+    
+    # use the string: coded_column_name (e.g. "x2") to look up the numerical index of the column name in design_coded.
+    col_index = which(colnames(design_coded) == coded_column_name)
+
+    ##### Converting the coded values to real values using linear regression
+    ## build the regression training dataset by using the row number to look up the min and max values for the component
+    ## and build a data.frame by paring them with -1 and 1 as the Y values
+    training_df = data.frame(y = c(components_df[row,"Max"], components_df[row,"Min"]), x = c(1, -1))
+
+    ## build the regression model
+    model = lm(y ~ x, data = training_df)
+
+    # Generate the input data by using the coded_column_name to look up the correct column in the design_coded df.
+    # then make a new df with one column
+    input <- data.frame(x = design_coded[,col_index])
+
+    # create a new column with the variable name
+    # populate with the predicted values
+    design_coded[, variable_name] <- predict(model, newdata = input)
+
+
+    # create the new column with the variable name as the col name
+    # uses the col index to look up the values in the coded design
+
+
+}
+
+# copy the coded df
+design_real <- design_coded
+
+# drop the coded columns
+design_real <-design_real %>%
+            select(-starts_with('x'))
+
+# write both to disk as .csv
+write.csv(design_real,"design_real.csv", row.names = TRUE)
+write.csv(design_coded,"design_coded.csv", row.names = TRUE)
